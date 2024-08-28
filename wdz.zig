@@ -13,5 +13,9 @@ pub fn main() !void {
     defer allocator.free(path);
     std.debug.print("Current directory: {s}\n", .{path});
 }
-
+// add
+// del/rm
+// ls/list
 pub const Bookmark = struct { name: []u8, path: []u8 };
+pub const BookmarkFile = struct { path: []u8 = "~/.wdz" };
+// BookmarkFile .content?
