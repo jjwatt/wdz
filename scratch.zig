@@ -12,6 +12,11 @@ pub fn main() !void {
     const path = try d.realpathAlloc(allocator, ".");
     defer allocator.free(path);
     std.debug.print("Current directory: {s}\n", .{path});
+
+    std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path2 = try d.realpath(".", &buf);
+    std.debug.print("Current directory from buf: {s}\n", .{path2});
 }
 
 pub const Bookmark = struct { name: []u8, path: []u8 };
