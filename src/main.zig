@@ -1,24 +1,85 @@
 const std = @import("std");
+const fs = std.fs;
+const os = std.os;
+const process = std.process;
+
+pub const dbfile = ".wdz";
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    //const path: ?[]u8 = try getCwd() orelse "";
+    const d: std.fs.Dir = std.fs.cwd();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    var allocator = gpa.allocator();
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    var progargs = process.args();
+    std.debug.print("ArgIterator looks like {}\n", .{progargs});
+    std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    // Found this is main.zig
+    // gives a type error for me
+    // var arena_instance = std.heap.ArenaAllocator.init(gpa);
+    // defer arena_instance.deinit();
+    // const arena = arena_instance.allocator();
 
-    try bw.flush(); // don't forget to flush!
+    const page_alloc = std.heap.page_allocator;
+    const args_alloc_args = try process.argsAlloc(page_alloc);
+    std.debug.print("args_alloc_args: {s}\n", .{args_alloc_args});
+    // args_alloc_args is a slice
+    const argstype = @TypeOf(args_alloc_args);
+    std.debug.print("type of args_alloc_args: {}\n", .{argstype});
+    for (args_alloc_args) |arg| {
+        std.debug.print("arg from loop args_alloc_args: {s}\n", .{arg});
+    }
+    defer page_alloc.free(args_alloc_args);
+
+    const home_dir = try process.getEnvVarOwned(allocator, "HOME");
+    defer allocator.free(home_dir);
+    std.debug.print("home_dir is {s}\n", .{home_dir});
+
+    std.debug.print("cwd is {d}\n", d);
+    std.debug.print("trying to look in value: {}\n", .{d});
+
+    std.debug.print("Trying to use realPathAlloc and an allocator...", .{});
+    const path = try d.realpathAlloc(allocator, ".");
+    defer allocator.free(path);
+    std.debug.print("Current directory from allocator: {s}\n", .{path});
+
+    std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path2 = try d.realpath(".", &buf);
+    std.debug.print("Current directory from buf: {s}\n", .{path2});
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+// pub fn add(name: []u8, path: []u8) !void {
+//     // call addToFile with the global file name
+// }
+// pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
+//     // open db file
+//     // name & path to file
+// }
+pub fn getCwd(allocator: std.mem.Allocator) !?[]u8 {
+    const d: std.fs.Dir = std.fs.cwd();
+    std.debug.print("cwd is {d}\n", d);
+    std.debug.print("trying to look in value: {}\n", .{d});
+
+    const path = try d.realpathAlloc(allocator, ".");
+    std.debug.print("Current directory: {s}\n", .{path});
+    // can't really return this. I need to learn more zig.
+    return path;
 }
+// cwd (call real fs.cwd() or override for testing)
+// add (Bookmark, BookmarkFile)
+//   add will add the string and cwd to the bookmarkfile
+// dirAdd (name: []u8, directory: fs.Dir, BookmarkFile)
+// del/rm (Identifier, BookmarkFile)
+// pop (Identifier, BookmarkFile)
+//    rm removes all occurances, pop just the last one.
+// ls/list (Filter, BookmarkFile)
+// readfile (BookmarkFile)
+// writefile (BookmarkFile)
+// Identifier would just be a string that we can check against multiple fields
+// Filter would be a string that we can search or maybe glob or re
+// pub const Bookmark = struct { name: []u8, path: []u8 };
+// pub const BookmarkFile = struct { path: []u8 = "~/.wdz" };
+// BookmarkFile .content?
