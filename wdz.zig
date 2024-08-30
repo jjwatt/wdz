@@ -5,13 +5,15 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     var allocator = gpa.allocator();
-
-    const thing = try getCwd(&allocator);
-    defer allocator.free(thing);
-    std.debug.print("thing is {?s}\n", .{thing});
+    const d: std.fs.Dir = std.fs.cwd();
+    std.debug.print("cwd is {d}\n", d);
+    std.debug.print("trying to look in value: {}\n", .{d});
+    const path = try d.realpathAlloc(allocator, ".");
+    defer allocator.free(path);
+    std.debug.print("Current directory: {s}\n", .{path});
 }
 
-pub fn getCwd(allocator: *std.mem.Allocator) !?[]u8 {
+pub fn getCwd(allocator: std.mem.Allocator) !?[]u8 {
     const d: std.fs.Dir = std.fs.cwd();
     std.debug.print("cwd is {d}\n", d);
     std.debug.print("trying to look in value: {}\n", .{d});
@@ -24,6 +26,8 @@ pub fn getCwd(allocator: *std.mem.Allocator) !?[]u8 {
 // add (Bookmark, BookmarkFile)
 // dirAdd (name: []u8, directory: fs.Dir, BookmarkFile)
 // del/rm (Identifier, BookmarkFile)
+// pop (Identifier, BookmarkFile)
+//    rm removes all occurances, pop just the last one.
 // ls/list (Filter, BookmarkFile)
 // readfile (BookmarkFile)
 // writefile (BookmarkFile)
