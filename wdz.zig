@@ -1,16 +1,28 @@
 const std = @import("std");
+const fs = std.fs;
+const os = std.os;
+const process = std.process;
 
-pub const dbfile = "~/.wdz";
+pub const dbfile = ".wdz";
 
 pub fn main() !void {
     //const path: ?[]u8 = try getCwd() orelse "";
     const d: std.fs.Dir = std.fs.cwd();
-    std.debug.print("cwd is {d}\n", d);
-    std.debug.print("trying to look in value: {}\n", .{d});
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     var allocator = gpa.allocator();
+
+    var progargs = process.args();
+    std.debug.print("ArgIterator looks like {}\n", .{progargs});
+    std.debug.print("arg: {?s}\n", .{progargs.next()});
+
+    const home_dir = try process.getEnvVarOwned(allocator, "HOME");
+    defer allocator.free(home_dir);
+    std.debug.print("home_dir is {s}\n", .{home_dir});
+
+    std.debug.print("cwd is {d}\n", d);
+    std.debug.print("trying to look in value: {}\n", .{d});
+
     std.debug.print("Trying to use realPathAlloc and an allocator...", .{});
     const path = try d.realpathAlloc(allocator, ".");
     defer allocator.free(path);
@@ -22,13 +34,13 @@ pub fn main() !void {
     std.debug.print("Current directory from buf: {s}\n", .{path2});
 }
 
-pub fn add(name: []u8, path: []u8) !void {
-    // call addToFile with the global file name
-}
-pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
-    // open db file
-    // name & path to file
-}
+// pub fn add(name: []u8, path: []u8) !void {
+//     // call addToFile with the global file name
+// }
+// pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
+//     // open db file
+//     // name & path to file
+// }
 pub fn getCwd(allocator: std.mem.Allocator) !?[]u8 {
     const d: std.fs.Dir = std.fs.cwd();
     std.debug.print("cwd is {d}\n", d);
