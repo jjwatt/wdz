@@ -16,6 +16,23 @@ pub fn main() !void {
     std.debug.print("ArgIterator looks like {}\n", .{progargs});
     std.debug.print("arg: {?s}\n", .{progargs.next()});
 
+    // Found this is main.zig
+    // gives a type error for me
+    // var arena_instance = std.heap.ArenaAllocator.init(gpa);
+    // defer arena_instance.deinit();
+    // const arena = arena_instance.allocator();
+
+    const page_alloc = std.heap.page_allocator;
+    const args_alloc_args = try process.argsAlloc(page_alloc);
+    std.debug.print("args_alloc_args: {s}\n", .{args_alloc_args});
+    // args_alloc_args is a slice
+    const argstype = @TypeOf(args_alloc_args);
+    std.debug.print("type of args_alloc_args: {}\n", .{argstype});
+    for (args_alloc_args) |arg| {
+        std.debug.print("arg: {s}\n", .{arg});
+    }
+    defer page_alloc.free(args_alloc_args);
+
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
     std.debug.print("home_dir is {s}\n", .{home_dir});
