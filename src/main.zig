@@ -70,11 +70,21 @@ pub fn add(name: []u8, path: []u8) !void {
     // call addToFile with the global file name
     std.debug.print("adding: {}{}{}", name, default_delim, path);
 }
+
 pub fn getFileFromPath(path: []u8) !fs.File {
-    // TODO: create if it doesn't exist and get it for truncating
-    const file: fs.File = try fs.createFileAbsolute(path, .{});
+    const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
+        error.FileNotFound => {
+            const new_file = try fs.createFileAbsolute(path, .{});
+            return new_file;
+        },
+        else => {
+            std.debug.print("error opening file: {}\n", .{err});
+            return err;
+        },
+    };
     return file;
 }
+
 pub fn addToFile(name: []u8, path: []u8, file: fs.File) !void {
     const bytes_written = try file.writeAll("{}{}{}\n", name, path);
     std.debug.print("bytes written: {d}.\n", .{bytes_written});
