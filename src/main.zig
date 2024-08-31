@@ -3,7 +3,11 @@ const fs = std.fs;
 const os = std.os;
 const process = std.process;
 
-pub const dbfile = ".wdz";
+// TODO: I want this to be $HOME/.wdz
+// pub const dbfile = ".wdz";
+
+// default k,v delim
+const default_delim = "|";
 
 pub fn main() !void {
     //const path: ?[]u8 = try getCwd() orelse "";
@@ -14,20 +18,21 @@ pub fn main() !void {
 
     var progargs = process.args();
     std.debug.print("ArgIterator looks like {}\n", .{progargs});
-    std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
-
-    // Found this is main.zig
-    // gives a type error for me
-    // var arena_instance = std.heap.ArenaAllocator.init(gpa);
-    // defer arena_instance.deinit();
-    // const arena = arena_instance.allocator();
+    // std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
+    // I think we can use while over the ArgIterator
+    while (progargs.next()) |arg| {
+        std.debug.print("arg from while ArgIterator: {s}\n", .{arg});
+    }
+    // yes, this works.
 
     const page_alloc = std.heap.page_allocator;
     const args_alloc_args = try process.argsAlloc(page_alloc);
     std.debug.print("args_alloc_args: {s}\n", .{args_alloc_args});
     // args_alloc_args is a slice
-    const argstype = @TypeOf(args_alloc_args);
-    std.debug.print("type of args_alloc_args: {}\n", .{argstype});
+    const ArgsType = @TypeOf(args_alloc_args);
+    std.debug.print("type of args_alloc_args: {}\n", .{ArgsType});
+    // TODO: switch on command line arguments
+    // e.g., if it's add, if it's ls
     for (args_alloc_args) |arg| {
         std.debug.print("arg from loop args_alloc_args: {s}\n", .{arg});
     }
@@ -37,6 +42,16 @@ pub fn main() !void {
     defer allocator.free(home_dir);
     std.debug.print("home_dir is {s}\n", .{home_dir});
 
+    // default bookmark file filename
+    const default_bm_filename = ".wdz";
+    // try to construct the full path to the dbfile
+    const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
+    defer allocator.free(bm_file_path);
+    std.debug.print("full db file path: {s}\n", .{bm_file_path});
+
+    const myfile = try getFileFromPath(bm_file_path);
+    defer myfile.close();
+    std.debug.print("file is {}\n", .{myfile});
     std.debug.print("cwd is {d}\n", d);
     std.debug.print("trying to look in value: {}\n", .{d});
 
@@ -51,9 +66,19 @@ pub fn main() !void {
     std.debug.print("Current directory from buf: {s}\n", .{path2});
 }
 
-// pub fn add(name: []u8, path: []u8) !void {
-//     // call addToFile with the global file name
-// }
+pub fn add(name: []u8, path: []u8) !void {
+    // call addToFile with the global file name
+    std.debug.print("adding: {}{}{}", name, default_delim, path);
+}
+pub fn getFileFromPath(path: []u8) !fs.File {
+    // TODO: create if it doesn't exist and get it for truncating
+    const file: fs.File = try fs.createFileAbsolute(path, .{});
+    return file;
+}
+pub fn addToFile(name: []u8, path: []u8, file: fs.File) !void {
+    const bytes_written = try file.writeAll("{}{}{}\n", name, path);
+    std.debug.print("bytes written: {d}.\n", .{bytes_written});
+}
 // pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
 //     // open db file
 //     // name & path to file
