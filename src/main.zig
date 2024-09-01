@@ -7,7 +7,7 @@ const process = std.process;
 // pub const dbfile = ".wdz";
 
 // default k,v delim
-const default_delim = "|";
+const delim = "|";
 
 pub fn main() !void {
     //const path: ?[]u8 = try getCwd() orelse "";
@@ -55,22 +55,30 @@ pub fn main() !void {
     std.debug.print("cwd is {d}\n", d);
     std.debug.print("trying to look in value: {}\n", .{d});
 
-    std.debug.print("Trying to use realPathAlloc and an allocator...", .{});
-    const path = try d.realpathAlloc(allocator, ".");
-    defer allocator.free(path);
-    std.debug.print("Current directory from allocator: {s}\n", .{path});
+    // std.debug.print("Trying to use realPathAlloc and an allocator...", .{});
+    // const path = try d.realpathAlloc(allocator, ".");
+    // defer allocator.free(path);
+    // std.debug.print("Current directory from allocator: {s}\n", .{path});
 
     std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
     var buf: [std.fs.max_path_bytes]u8 = undefined;
     const path2 = try d.realpath(".", &buf);
     std.debug.print("Current directory from buf: {s}\n", .{path2});
+
+    // fake adding
+    const fakename = "fakename";
+    _ = try add(fakename, path2);
 }
 
-pub fn add(name: []u8, path: []u8) !void {
+pub fn add(name: []const u8, path: []u8) !void {
     // call addToFile with the global file name
-    std.debug.print("adding: {}{}{}", name, default_delim, path);
+    return addToFile(name, path);
+    std.debug.print("adding: {s}{s}{s}", .{ name, delim, path });
 }
-
+pub fn addToFile(name: []u8, path: []u8, file: fs.File) !void {
+    const bytes_written = try file.writeAll("{}{}{}\n", name, path);
+    std.debug.print("bytes written: {d}.\n", .{bytes_written});
+}
 pub fn getFileFromPath(path: []u8) !fs.File {
     const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
         error.FileNotFound => {
@@ -85,24 +93,20 @@ pub fn getFileFromPath(path: []u8) !fs.File {
     return file;
 }
 
-pub fn addToFile(name: []u8, path: []u8, file: fs.File) !void {
-    const bytes_written = try file.writeAll("{}{}{}\n", name, path);
-    std.debug.print("bytes written: {d}.\n", .{bytes_written});
-}
 // pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
 //     // open db file
 //     // name & path to file
 // }
-pub fn getCwd(allocator: std.mem.Allocator) !?[]u8 {
-    const d: std.fs.Dir = std.fs.cwd();
-    std.debug.print("cwd is {d}\n", d);
-    std.debug.print("trying to look in value: {}\n", .{d});
+// pub fn getCwd(allocator: std.mem.Allocator) !?[]u8 {
+//     const d: std.fs.Dir = std.fs.cwd();
+//     std.debug.print("cwd is {d}\n", d);
+//     std.debug.print("trying to look in value: {}\n", .{d});
 
-    const path = try d.realpathAlloc(allocator, ".");
-    std.debug.print("Current directory: {s}\n", .{path});
-    // can't really return this. I need to learn more zig.
-    return path;
-}
+//     const path = try d.realpathAlloc(allocator, ".");
+//     std.debug.print("Current directory: {s}\n", .{path});
+//     // can't really return this. I need to learn more zig.
+//     return path;
+// }
 // cwd (call real fs.cwd() or override for testing)
 // add (Bookmark, BookmarkFile)
 //   add will add the string and cwd to the bookmarkfile
