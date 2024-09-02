@@ -1,5 +1,6 @@
 const std = @import("std");
 const fs = std.fs;
+const mem = std.mem;
 const os = std.os;
 const process = std.process;
 
@@ -26,32 +27,16 @@ pub fn main() !void {
     while (progargs.next()) |arg| {
         std.debug.print("arg from while ArgIterator: {s}\n", .{arg});
     }
-    // yes, this works.
-
-    // const page_alloc = std.heap.page_allocator;
-    // const args_alloc_args = try process.argsAlloc(page_alloc);
-    // std.debug.print("args_alloc_args: {s}\n", .{args_alloc_args});
-    // // args_alloc_args is a slice
-    // const ArgsType = @TypeOf(args_alloc_args);
-    // std.debug.print("type of args_alloc_args: {}\n", .{ArgsType});
-    // // TODO: switch on command line arguments
-    // // e.g., if it's add, if it's ls
-    // for (args_alloc_args) |arg| {
-    //     std.debug.print("arg from loop args_alloc_args: {s}\n", .{arg});
-    // }
-    // defer page_alloc.free(args_alloc_args);
 
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
     std.debug.print("home_dir is {s}\n", .{home_dir});
+    // cat filename onto the end of home_dir
+    const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
+    defer allocator.free(bm_file_path);
 
     std.debug.print("cwd is {d}\n", d);
     std.debug.print("trying to look in value: {}\n", .{d});
-
-    // std.debug.print("Trying to use realPathAlloc and an allocator...", .{});
-    // const path = try d.realpathAlloc(allocator, ".");
-    // defer allocator.free(path);
-    // std.debug.print("Current directory from allocator: {s}\n", .{path});
 
     std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
     var buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -60,21 +45,13 @@ pub fn main() !void {
 
     // fake adding
     const fakename = "fakebmname3";
-    _ = try add(fakename, path2);
+    _ = try add(fakename, path2, bm_file_path);
+    const readfile = try getFileFromPath(bm_file_path);
+    defer readfile.close();
+    _ = try readFileLinesReverse(readfile);
 }
 
-pub fn add(name: []const u8, path: []u8) !void {
-    // The file has to be in your home dir for now.
-    // TODO: support using an absolute path.
-    const home_dir = try process.getEnvVarOwned(allocator, "HOME");
-    defer allocator.free(home_dir);
-
-    std.debug.print("adding: {s}{s}{s}\n", .{ name, delim, path });
-    // try to construct the full path to the dbfile
-    const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
-    defer allocator.free(bm_file_path);
-    std.debug.print("full db file path: {s}\n", .{bm_file_path});
-
+pub fn add(name: []const u8, path: []u8, bm_file_path: []u8) !void {
     const myfile = try getFileFromPath(bm_file_path);
     defer myfile.close();
     std.debug.print("file is {}\n", .{myfile});
@@ -103,7 +80,31 @@ pub fn getFileFromPath(path: []u8) !fs.File {
     };
     return file;
 }
+pub fn readFileLinesReverse(file: fs.File) !void {
+    // Read file into memory
+    const stat = try file.stat();
+    var buffer = try allocator.alloc(u8, stat.size);
+    defer allocator.free(buffer);
+    const buffer_rev = try allocator.alloc(u8, stat.size);
+    defer allocator.free(buffer_rev);
 
+    const bytesread = try file.readAll(buffer);
+    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
+
+    // Process lines in reverse.
+    var end = stat.size;
+    while (end > 0) {
+        // Find the start of the current line.
+        // Keep moving start and end in the loop.
+        const start = mem.lastIndexOfScalar(u8, buffer[0..end], '\n') orelse 0;
+        std.debug.print("{s}\n", .{buffer[start..end]});
+        // Move to the previous line.
+        end = start;
+    }
+    // if (end == 0 and buffer[0] != '\n') {
+    //     std.debug.print("{s}\n", .{buffer[0..]});
+    // }
+}
 // pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
 //     // open db file
 //     // name & path to file
