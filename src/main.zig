@@ -59,7 +59,7 @@ pub fn main() !void {
     std.debug.print("Current directory from buf: {s}\n", .{path2});
 
     // fake adding
-    const fakename = "fakebmname2";
+    const fakename = "fakebmname3";
     _ = try add(fakename, path2);
 }
 
@@ -82,13 +82,13 @@ pub fn add(name: []const u8, path: []u8) !void {
 }
 pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
     // it doesn't write to the end and I don't see an O_APPEND Flag in OpenFlags...
-    // let's try seeking to the end I guess
+    // Seek to the end for append.
     const stat = try file.stat();
     try file.seekTo(stat.size);
-    var bytes = try file.write(name);
-    bytes = try file.write(delim);
-    bytes = try file.write(path);
-    bytes = try file.write("\n");
+    var bufwriter = std.io.bufferedWriter(file.writer());
+    const writer = bufwriter.writer();
+    try writer.print("{s}{s}{s}\n", .{ name, delim, path });
+    try bufwriter.flush();
 }
 pub fn getFileFromPath(path: []u8) !fs.File {
     const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
