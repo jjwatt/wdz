@@ -8,13 +8,16 @@ const process = std.process;
 
 // default k,v delim
 const delim = "|";
+// default bookmark file filename
+const default_bm_filename = ".wdz";
+// TODO: pass the allocator to functions instead of global
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var allocator = gpa.allocator();
 
 pub fn main() !void {
     //const path: ?[]u8 = try getCwd() orelse "";
-    const d: std.fs.Dir = std.fs.cwd();
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    var allocator = gpa.allocator();
+    const d: std.fs.Dir = std.fs.cwd();
 
     var progargs = process.args();
     std.debug.print("ArgIterator looks like {}\n", .{progargs});
@@ -25,33 +28,23 @@ pub fn main() !void {
     }
     // yes, this works.
 
-    const page_alloc = std.heap.page_allocator;
-    const args_alloc_args = try process.argsAlloc(page_alloc);
-    std.debug.print("args_alloc_args: {s}\n", .{args_alloc_args});
-    // args_alloc_args is a slice
-    const ArgsType = @TypeOf(args_alloc_args);
-    std.debug.print("type of args_alloc_args: {}\n", .{ArgsType});
-    // TODO: switch on command line arguments
-    // e.g., if it's add, if it's ls
-    for (args_alloc_args) |arg| {
-        std.debug.print("arg from loop args_alloc_args: {s}\n", .{arg});
-    }
-    defer page_alloc.free(args_alloc_args);
+    // const page_alloc = std.heap.page_allocator;
+    // const args_alloc_args = try process.argsAlloc(page_alloc);
+    // std.debug.print("args_alloc_args: {s}\n", .{args_alloc_args});
+    // // args_alloc_args is a slice
+    // const ArgsType = @TypeOf(args_alloc_args);
+    // std.debug.print("type of args_alloc_args: {}\n", .{ArgsType});
+    // // TODO: switch on command line arguments
+    // // e.g., if it's add, if it's ls
+    // for (args_alloc_args) |arg| {
+    //     std.debug.print("arg from loop args_alloc_args: {s}\n", .{arg});
+    // }
+    // defer page_alloc.free(args_alloc_args);
 
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
     std.debug.print("home_dir is {s}\n", .{home_dir});
 
-    // default bookmark file filename
-    const default_bm_filename = ".wdz";
-    // try to construct the full path to the dbfile
-    const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
-    defer allocator.free(bm_file_path);
-    std.debug.print("full db file path: {s}\n", .{bm_file_path});
-
-    const myfile = try getFileFromPath(bm_file_path);
-    defer myfile.close();
-    std.debug.print("file is {}\n", .{myfile});
     std.debug.print("cwd is {d}\n", d);
     std.debug.print("trying to look in value: {}\n", .{d});
 
@@ -66,18 +59,36 @@ pub fn main() !void {
     std.debug.print("Current directory from buf: {s}\n", .{path2});
 
     // fake adding
-    const fakename = "fakename";
+    const fakename = "fakebmname2";
     _ = try add(fakename, path2);
 }
 
 pub fn add(name: []const u8, path: []u8) !void {
-    // call addToFile with the global file name
-    return addToFile(name, path);
-    std.debug.print("adding: {s}{s}{s}", .{ name, delim, path });
+    // The file has to be in your home dir for now.
+    // TODO: support using an absolute path.
+    const home_dir = try process.getEnvVarOwned(allocator, "HOME");
+    defer allocator.free(home_dir);
+
+    std.debug.print("adding: {s}{s}{s}\n", .{ name, delim, path });
+    // try to construct the full path to the dbfile
+    const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
+    defer allocator.free(bm_file_path);
+    std.debug.print("full db file path: {s}\n", .{bm_file_path});
+
+    const myfile = try getFileFromPath(bm_file_path);
+    defer myfile.close();
+    std.debug.print("file is {}\n", .{myfile});
+    return addToFile(name, path, myfile);
 }
-pub fn addToFile(name: []u8, path: []u8, file: fs.File) !void {
-    const bytes_written = try file.writeAll("{}{}{}\n", name, path);
-    std.debug.print("bytes written: {d}.\n", .{bytes_written});
+pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
+    // it doesn't write to the end and I don't see an O_APPEND Flag in OpenFlags...
+    // let's try seeking to the end I guess
+    const stat = try file.stat();
+    try file.seekTo(stat.size);
+    var bytes = try file.write(name);
+    bytes = try file.write(delim);
+    bytes = try file.write(path);
+    bytes = try file.write("\n");
 }
 pub fn getFileFromPath(path: []u8) !fs.File {
     const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
