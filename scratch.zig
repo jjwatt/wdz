@@ -66,3 +66,55 @@ pub fn readFileLinesReverse(allocator: *Allocator, file_path: []const u8) !void 
 // }
 
 pub const Bookmark = struct { name: []u8, path: []u8 };
+const std = @import("std");
+const fs = std.fs;
+const mem = std.mem;
+const ArrayList = std.ArrayList;
+
+pub fn readFileLinesReverse(file: fs.File, allocator: *std.mem.Allocator) ![]u8 {
+    // Read file into memory
+    const stat = try file.stat();
+    var buffer = try allocator.alloc(u8, stat.size);
+    defer allocator.free(buffer);
+
+    const bytes_read = try file.readAll(buffer);
+    if (bytes_read != stat.size) return error.UnexpectedEndOfFile;
+
+    // Split the buffer into lines
+    var lines = ArrayList([]const u8).init(allocator);
+    defer lines.deinit();
+
+    var line_start: usize = 0;
+    for (buffer) |char, i| {
+        if (char == '\n') {
+            try lines.append(buffer[line_start..i]);
+            line_start = i + 1;
+        }
+    }
+    // Add the last line if it doesn't end with a newline
+    if (line_start < buffer.len) {
+        try lines.append(buffer[line_start..]);
+    }
+
+    // Reverse the order of lines
+    var reversed_lines = ArrayList([]const u8).init(allocator);
+    defer reversed_lines.deinit();
+
+    for (lines.items) |line| {
+        try reversed_lines.insert(0, line);
+    }
+
+    // Join the reversed lines into a single string
+    var result = std.ArrayList(u8).init(allocator);
+    for (reversed_lines.items) |line| {
+        try result.appendSlice(line);
+        try result.append('\n');
+    }
+
+    // Remove the trailing newline if it exists
+    if (result.items.len > 0 and result.items[result.items.len - 1] == '\n') {
+        _ = result.pop();
+    }
+
+    return result.toOwnedSlice();
+}
