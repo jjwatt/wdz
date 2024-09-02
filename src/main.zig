@@ -87,13 +87,45 @@ pub fn readFileLinesReverse(file: fs.File) ![]u8 {
     var buffer = try allocator.alloc(u8, stat.size);
     defer allocator.free(buffer);
     var buffer_rev = std.ArrayList(u8).init(allocator);
-
+    defer buffer_rev.deinit();
     const bytesread = try file.readAll(buffer);
     if (bytesread != stat.size) return error.UnexpectedEndOfFile;
 
     // Process lines in reverse.
     var end = stat.size;
+    var start = end;
 
+    while (start > 0) {
+        start = mem.lastIndexOfScalar(u8, buffer[0..end], '\n') orelse 0;
+        // If at the start of the file or a newline, process the line.
+        if (start == 0 or buffer[start - 1] == '\n') {
+            // Append the line, excluding newline if it's not the first line
+            if (start > 0) {
+                try buffer_rev.appendSlice(buffer[start..end]);
+            } else {
+                // For the first line, include it entirely
+                try buffer_rev.appendSlice(buffer[0..end]);
+            }
+            // Add a newline for all lines except the last one
+            if (start > 0 or buffer[0] != '\n') {
+                try buffer_rev.append('\n');
+            }
+            // Move to the previous line
+            end = start;
+        } else {
+            // If we didn't find a newline we're at the first line
+            try buffer_rev.appendSlice(buffer[0..end]);
+            break;
+        }
+    }
+    // If the file ended with a newline remove it
+    if (buffer_rev.items.len > 0 and buffer_rev.items[buffer_rev.items.len - 1] == '\n') {
+        _ = buffer_rev.pop();
+    }
+    // Reverse the whole thing.
+    const rev = try allocator.alloc(u8, buffer_rev.items.len);
+    mem.copyForwards(u8, rev, buffer_rev.items);
+    return rev;
     // while (end > 0) {
     //     // Find the start of the current line.
     //     // Keep moving start and end in the loop.
@@ -108,7 +140,7 @@ pub fn readFileLinesReverse(file: fs.File) ![]u8 {
     //     end = start;
     //     // TODO: the first one doesn't have a \n
     // }
-    return buffer_rev.toOwnedSlice();
+
     // if (end == 0 and buffer[0] != '\n') {
     //     std.debug.print("{s}\n", .{buffer[0..]});
     // }
