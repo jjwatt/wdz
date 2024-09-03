@@ -38,20 +38,48 @@ pub fn main() !void {
     std.debug.print("cwd is {d}\n", d);
     std.debug.print("trying to look in value: {}\n", .{d});
 
+    // Is this cool?
     std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
     var buf: [std.fs.max_path_bytes]u8 = undefined;
     const path2 = try d.realpath(".", &buf);
     std.debug.print("Current directory from buf: {s}\n", .{path2});
 
-    const fakename = "fakebmname8";
-    _ = try add(fakename, path2, bm_file_path);
+    // stop adding while I mess with finding.
+    // const fakename = "fakebmname4";
+    // _ = try add(fakename, path2, bm_file_path);
+
     const readfile = try getFileFromPath(bm_file_path);
     defer readfile.close();
     const rev = try readFileLinesReverse(readfile);
-    std.debug.print("rev: {s}\n", .{rev});
     defer allocator.free(rev);
+    std.debug.print("rev: \n {s}\n", .{rev});
+    var entries = mem.split(u8, rev, "\n");
+    // std.debug.print("sm: {}\n", .{sm});
+    findloop: while (entries.next()) |entry| {
+        std.debug.print("entry: {s}\n", .{entry});
+        if (mem.startsWith(u8, entry, "fakebmname4")) {
+            std.debug.print("found: {s}\n", .{entry});
+            break :findloop;
+        }
+    } else {
+        std.debug.print("entry not found", .{});
+    }
+    // try find function
+    const entry = try find("fakebmname4", &entries);
+    std.debug.print("found entry: {s}\n", .{entry});
 }
-
+pub fn find(name: []const u8, entries: *mem.SplitIterator(u8, .sequence)) ![]const u8 {
+    while (entries.next()) |entry| {
+        std.debug.print("entry: {s}\n", .{entry});
+        if (mem.startsWith(u8, entry, name)) {
+            std.debug.print("found: {s}\n", .{entry});
+            return entry;
+        }
+    } else {
+        std.debug.print("return NotFound", .{});
+        return "not found\n";
+    }
+}
 pub fn add(name: []const u8, path: []u8, bm_file_path: []u8) !void {
     const myfile = try getFileFromPath(bm_file_path);
     defer myfile.close();
@@ -86,64 +114,36 @@ pub fn readFileLinesReverse(file: fs.File) ![]u8 {
     const stat = try file.stat();
     var buffer = try allocator.alloc(u8, stat.size);
     defer allocator.free(buffer);
-    var buffer_rev = std.ArrayList(u8).init(allocator);
-    defer buffer_rev.deinit();
     const bytesread = try file.readAll(buffer);
     if (bytesread != stat.size) return error.UnexpectedEndOfFile;
 
-    // Process lines in reverse.
-    var end = stat.size;
-    var start = end;
+    // Split buffer into lines
+    var lines = std.ArrayList([]const u8).init(allocator);
+    defer lines.deinit();
 
-    while (start > 0) {
-        start = mem.lastIndexOfScalar(u8, buffer[0..end], '\n') orelse 0;
-        // If at the start of the file or a newline, process the line.
-        if (start == 0 or buffer[start - 1] == '\n') {
-            // Append the line, excluding newline if it's not the first line
-            if (start > 0) {
-                try buffer_rev.appendSlice(buffer[start..end]);
-            } else {
-                // For the first line, include it entirely
-                try buffer_rev.appendSlice(buffer[0..end]);
-            }
-            // Add a newline for all lines except the last one
-            if (start > 0 or buffer[0] != '\n') {
-                try buffer_rev.append('\n');
-            }
-            // Move to the previous line
-            end = start;
-        } else {
-            // If we didn't find a newline we're at the first line
-            try buffer_rev.appendSlice(buffer[0..end]);
-            break;
+    var line_start: usize = 0;
+    for (buffer, 0..) |char, i| {
+        if (char == '\n') {
+            try lines.append(buffer[line_start..i]);
+            line_start = i + 1;
         }
     }
-    // If the file ended with a newline remove it
-    if (buffer_rev.items.len > 0 and buffer_rev.items[buffer_rev.items.len - 1] == '\n') {
-        _ = buffer_rev.pop();
+    // Add the last line if it doesn't end in a newline.
+    if (line_start < buffer.len) {
+        try lines.append(buffer[line_start..]);
     }
-    // Reverse the whole thing.
-    const rev = try allocator.alloc(u8, buffer_rev.items.len);
-    mem.copyForwards(u8, rev, buffer_rev.items);
-    return rev;
-    // while (end > 0) {
-    //     // Find the start of the current line.
-    //     // Keep moving start and end in the loop.
-    //     const start = mem.lastIndexOfScalar(u8, buffer[0..end], '\n') orelse 0;
-    //     // if (mem.startsWith(u8, buffer[start..end], "\n")) {
-    //     //     continue;
-    //     // }
-    //     try buffer_rev.appendSlice(buffer[start..end]);
-    //     // try buffer_rev.appendSlice("\n");
-    //     // std.debug.print("{s}\n", .{buffer[start..end]});
-    //     // Move to the previous line.
-    //     end = start;
-    //     // TODO: the first one doesn't have a \n
-    // }
-
-    // if (end == 0 and buffer[0] != '\n') {
-    //     std.debug.print("{s}\n", .{buffer[0..]});
-    // }
+    // Reverse the order of the lines.
+    var reversed_lines = std.ArrayList([]const u8).init(allocator);
+    defer reversed_lines.deinit();
+    for (lines.items) |line| {
+        try reversed_lines.insert(0, line);
+    }
+    var result = std.ArrayList(u8).init(allocator);
+    for (reversed_lines.items) |line| {
+        try result.appendSlice(line);
+        try result.append('\n');
+    }
+    return result.toOwnedSlice();
 }
 // pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
 //     // open db file

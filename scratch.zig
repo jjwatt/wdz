@@ -97,9 +97,8 @@ pub fn readFileLinesReverse(file: fs.File, allocator: *std.mem.Allocator) ![]u8 
     }
 
     // Reverse the order of lines
-    var reversed_lines = ArrayList([]const u8).init(allocator);
+    var reversed_lines = std.ArrayList([]const u8).init(allocator);
     defer reversed_lines.deinit();
-
     for (lines.items) |line| {
         try reversed_lines.insert(0, line);
     }
