@@ -50,10 +50,7 @@ pub fn main() !void {
         }
     }
 
-    const bm_file_path = try getBookmarkFilePath(allocator);
-    defer allocator.free(bm_file_path);
-    const readfile = try getBookMarkFileFromPath(bm_file_path);
-    defer readfile.close();
+    const readfile = try getBookMarkFile(allocator);
     const rev = try readFileLinesReverse(allocator, readfile);
     defer allocator.free(rev);
     // std.debug.print("rev: \n {s}\n", .{rev});
@@ -62,7 +59,13 @@ pub fn main() !void {
     const entry = try find("fakebmname4", &rev);
     std.debug.print("found entry: {s}\n", .{entry});
 }
-
+pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
+    // return the bookmark file
+    const bm_file_path = try getBookmarkFilePath(allocator);
+    defer allocator.free(bm_file_path);
+    const readfile = try getBookMarkFileFromPath(bm_file_path);
+    return readfile;
+}
 pub fn getBookmarkFilePath(allocator: mem.Allocator) ![]u8 {
     // get the bookmark file path
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
@@ -71,6 +74,19 @@ pub fn getBookmarkFilePath(allocator: mem.Allocator) ![]u8 {
     // cat filename onto the end of home_dir
     const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
     return bm_file_path;
+}
+pub fn getBookMarkFileFromPath(path: []u8) !fs.File {
+    const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
+        error.FileNotFound => {
+            const new_file = try fs.createFileAbsolute(path, .{});
+            return new_file;
+        },
+        else => {
+            std.debug.print("error opening file: {}\n", .{err});
+            return err;
+        },
+    };
+    return file;
 }
 pub fn list(allocator: mem.Allocator, bm_file_path: []u8) !*const []u8 {
     // return list of records
@@ -123,19 +139,6 @@ pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
     const writer = bufwriter.writer();
     try writer.print("{s}{s}{s}\n", .{ name, delim, path });
     try bufwriter.flush();
-}
-pub fn getBookMarkFileFromPath(path: []u8) !fs.File {
-    const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
-        error.FileNotFound => {
-            const new_file = try fs.createFileAbsolute(path, .{});
-            return new_file;
-        },
-        else => {
-            std.debug.print("error opening file: {}\n", .{err});
-            return err;
-        },
-    };
-    return file;
 }
 pub fn readFileLinesReverse(allocator: mem.Allocator, file: fs.File) ![]u8 {
     // Read file into memory
