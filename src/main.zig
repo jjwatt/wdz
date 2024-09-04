@@ -30,43 +30,76 @@ pub fn main() !void {
     defer _ = gpa.deinit();
 
     var progargs = process.args();
-    std.debug.print("ArgIterator looks like {}\n", .{progargs});
-    std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
+    // std.debug.print("ArgIterator looks like {}\n", .{progargs});
+    // std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
     while (progargs.next()) |arg| {
-        std.debug.print("arg from while ArgIterator: {s}\n", .{arg});
+        // std.debug.print("arg from while ArgIterator: {s}\n", .{arg});
         if (mem.startsWith(u8, arg, "-")) {
             if (mem.eql(u8, arg, "-h") or mem.eql(u8, arg, "--help")) {
                 try io.getStdOut().writeAll(usage);
                 return;
             }
-            if (mem.eql(u8, arg, "-l") or mem.eql(u8, arg, "--ls")) {
+            if (mem.eql(u8, arg, "-l") or mem.eql(u8, arg, "--ls") or mem.eql(u8, arg, "--list")) {
                 const lst = try list(allocator);
                 defer allocator.free(lst);
-                std.debug.print("lst from list:\n{s}\n", .{lst});
+                std.debug.print("{s}\n", .{lst});
                 return;
             }
             if (mem.eql(u8, arg, "-a") or mem.eql(u8, arg, "--add")) {
-                // call add
-                return;
+                // Get bookmark name.
+                if (progargs.next()) |bm_name| {
+                    if (mem.startsWith(u8, bm_name, "-")) {
+                        std.log.err("Expected a name after -a or --add", .{});
+                        process.exit(1);
+                    } else {
+                        const bmfile = try getBookMarkFile(allocator);
+                        defer bmfile.close();
+                        _ = try add(allocator, bm_name);
+                        return;
+                    }
+                }
+            }
+            if (mem.eql(u8, arg, "-f") or mem.eql(u8, arg, "--find")) {
+                // Try to find latest bookmark name entry
+                // TODO: later we'll add pop() and iterators or multiple returns
+                if (progargs.next()) |bm_search| {
+                    if (mem.startsWith(u8, bm_search, "-")) {
+                        std.log.err("Expected string after -f or --find", .{});
+                        process.exit(1);
+                    } else {
+                        const bmfile = try getBookMarkFile(allocator);
+                        defer bmfile.close();
+                        const rev = try readFileLinesReverse(allocator, bmfile);
+                        defer allocator.free(rev);
+                        const entry = try find(bm_search, &rev);
+                        std.debug.print("{s}\n", .{entry});
+                        // if (entry) |e| {
+                        //     std.debug.print("{s}\n", .{e});
+                        //     process.exit(0);
+                        // } else {
+                        //     process.exit(1);
+                        // }
+                    }
+                }
             }
         }
     }
 
-    const readfile = try getBookMarkFile(allocator);
-    const rev = try readFileLinesReverse(allocator, readfile);
-    defer allocator.free(rev);
+    // const readfile = try getBookMarkFile(allocator);
+    // const rev = try readFileLinesReverse(allocator, readfile);
+    // defer allocator.free(rev);
     // std.debug.print("rev: \n {s}\n", .{rev});
     // try find function
-    std.debug.print("Using find() to find fakebmname4...\n", .{});
-    const entry = try find("fakebmname4", &rev);
-    std.debug.print("found entry: {s}\n", .{entry});
+    // std.debug.print("Using find() to find fakebmname4...\n", .{});
+    // const entry = try find("fakebmname4", &rev);
+    // std.debug.print("found entry: {s}\n", .{entry});
 }
 pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
     // return the bookmark file
     // bookmark file is always $HOME/$bm_file_path (set at the top)
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
-    std.debug.print("home_dir is {s}\n", .{home_dir});
+    // std.debug.print("home_dir is {s}\n", .{home_dir});
     // cat filename onto the end of home_dir
     const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
     defer allocator.free(bm_file_path);
@@ -84,11 +117,6 @@ pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
 }
 pub fn list(allocator: mem.Allocator) ![]u8 {
     // return list of records
-
-    // stop adding while I mess with finding.
-    // const fakename = "fakebmname4";
-    // _ = try add(fakename, path2, bm_file_path);
-
     const readfile = try getBookMarkFile(allocator);
     defer readfile.close();
     const rev = try readFileLinesReverse(allocator, readfile);
@@ -97,9 +125,8 @@ pub fn list(allocator: mem.Allocator) ![]u8 {
     return rev;
 }
 pub fn find(name: []const u8, records: *const []u8) ![]const u8 {
-    var entries = mem.split(u8, records.*, "\n");
+    var entries = mem.splitAny(u8, records.*, "\n");
     while (entries.next()) |entry| {
-        std.debug.print("entry: {s}\n", .{entry});
         if (mem.startsWith(u8, entry, name)) {
             return entry;
         }
@@ -109,20 +136,23 @@ pub fn find(name: []const u8, records: *const []u8) ![]const u8 {
         return "not found\n";
     }
 }
-pub fn add(allocator: mem.Allocator, name: []const u8, path: []u8) !void {
+// pub fn findInFile(name: []const u8) ![]const u8 {
+//     // try to find first entry in file.
+// }
+pub fn add(allocator: mem.Allocator, name: []const u8) !void {
     const d: std.fs.Dir = std.fs.cwd();
-    std.debug.print("cwd is {d}\n", d);
-    std.debug.print("trying to look in value: {}\n", .{d});
+    // std.debug.print("cwd is {d}\n", d);
+    // std.debug.print("trying to look in value: {}\n", .{d});
 
     // Is this cool?
-    std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
+    // std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
     var buf: [std.fs.max_path_bytes]u8 = undefined;
-    const path2 = try d.realpath(".", &buf);
-    std.debug.print("Current directory from buf: {s}\n", .{path2});
+    const path = try d.realpath(".", &buf);
+    // std.debug.print("Current directory from buf: {s}\n", .{path});
 
     const myfile = try getBookMarkFile(allocator);
     defer myfile.close();
-    std.debug.print("file is {}\n", .{myfile});
+    // std.debug.print("file is {}\n", .{myfile});
     return addToFile(name, path, myfile);
 }
 pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
