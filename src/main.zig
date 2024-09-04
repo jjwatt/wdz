@@ -22,13 +22,12 @@ const delim = "|";
 // default bookmark file filename
 const default_bm_filename = ".wdz";
 // TODO: refactor pass the allocator to functions instead of global
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var allocator = gpa.allocator();
 
 pub fn main() !void {
-    //const path: ?[]u8 = try getCwd() orelse "";
+    // const d: std.fs.Dir = std.fs.cwd();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpa.allocator();
     defer _ = gpa.deinit();
-    const d: std.fs.Dir = std.fs.cwd();
 
     var progargs = process.args();
     std.debug.print("ArgIterator looks like {}\n", .{progargs});
@@ -40,24 +39,40 @@ pub fn main() !void {
                 try io.getStdOut().writeAll(usage);
                 return;
             }
+            if (mem.eql(u8, arg, "-l") or mem.eql(u8, arg, "--ls")) {
+                // call list
+                return;
+            }
+            if (mem.eql(u8, arg, "-a") or mem.eql(u8, arg, "--add")) {
+                // call add
+                return;
+            }
         }
     }
 
+    const bm_file_path = try getFilePath(allocator);
+    defer allocator.free(bm_file_path);
+    const readfile = try getFileFromPath(bm_file_path);
+    defer readfile.close();
+    const rev = try readFileLinesReverse(allocator, readfile);
+    defer allocator.free(rev);
+    // std.debug.print("rev: \n {s}\n", .{rev});
+    // try find function
+    std.debug.print("Using find() to find fakebmname4...\n", .{});
+    const entry = try find("fakebmname4", &rev);
+    std.debug.print("found entry: {s}\n", .{entry});
+}
+pub fn getFilePath(allocator: mem.Allocator) ![]u8 {
+    // get the bookmark file path
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
     std.debug.print("home_dir is {s}\n", .{home_dir});
     // cat filename onto the end of home_dir
     const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
-    defer allocator.free(bm_file_path);
-
-    std.debug.print("cwd is {d}\n", d);
-    std.debug.print("trying to look in value: {}\n", .{d});
-
-    // Is this cool?
-    std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
-    var buf: [std.fs.max_path_bytes]u8 = undefined;
-    const path2 = try d.realpath(".", &buf);
-    std.debug.print("Current directory from buf: {s}\n", .{path2});
+    return bm_file_path;
+}
+pub fn list(allocator: mem.Allocator, bm_file_path: []u8) !*const []u8 {
+    // return list of records
 
     // stop adding while I mess with finding.
     // const fakename = "fakebmname4";
@@ -68,11 +83,6 @@ pub fn main() !void {
     const rev = try readFileLinesReverse(readfile);
     defer allocator.free(rev);
     // std.debug.print("rev: \n {s}\n", .{rev});
-
-    // try find function
-    std.debug.print("Using find() to find fakebmname4...\n", .{});
-    const entry = try find("fakebmname4", &rev);
-    std.debug.print("found entry: {s}\n", .{entry});
 }
 pub fn find(name: []const u8, records: *const []u8) ![]const u8 {
     var entries = mem.split(u8, records.*, "\n");
@@ -88,6 +98,16 @@ pub fn find(name: []const u8, records: *const []u8) ![]const u8 {
     }
 }
 pub fn add(name: []const u8, path: []u8, bm_file_path: []u8) !void {
+    const d: std.fs.Dir = std.fs.cwd();
+    std.debug.print("cwd is {d}\n", d);
+    std.debug.print("trying to look in value: {}\n", .{d});
+
+    // Is this cool?
+    std.debug.print("Trying to use fs.Dir.realpath without allocator...", .{});
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const path2 = try d.realpath(".", &buf);
+    std.debug.print("Current directory from buf: {s}\n", .{path2});
+
     const myfile = try getFileFromPath(bm_file_path);
     defer myfile.close();
     std.debug.print("file is {}\n", .{myfile});
@@ -116,7 +136,7 @@ pub fn getFileFromPath(path: []u8) !fs.File {
     };
     return file;
 }
-pub fn readFileLinesReverse(file: fs.File) ![]u8 {
+pub fn readFileLinesReverse(allocator: mem.Allocator, file: fs.File) ![]u8 {
     // Read file into memory
     const stat = try file.stat();
     var buffer = try allocator.alloc(u8, stat.size);
