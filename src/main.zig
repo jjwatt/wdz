@@ -50,9 +50,9 @@ pub fn main() !void {
         }
     }
 
-    const bm_file_path = try getFilePath(allocator);
+    const bm_file_path = try getBookmarkFilePath(allocator);
     defer allocator.free(bm_file_path);
-    const readfile = try getFileFromPath(bm_file_path);
+    const readfile = try getBookMarkFileFromPath(bm_file_path);
     defer readfile.close();
     const rev = try readFileLinesReverse(allocator, readfile);
     defer allocator.free(rev);
@@ -62,7 +62,8 @@ pub fn main() !void {
     const entry = try find("fakebmname4", &rev);
     std.debug.print("found entry: {s}\n", .{entry});
 }
-pub fn getFilePath(allocator: mem.Allocator) ![]u8 {
+
+pub fn getBookmarkFilePath(allocator: mem.Allocator) ![]u8 {
     // get the bookmark file path
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
@@ -78,7 +79,7 @@ pub fn list(allocator: mem.Allocator, bm_file_path: []u8) !*const []u8 {
     // const fakename = "fakebmname4";
     // _ = try add(fakename, path2, bm_file_path);
 
-    const readfile = try getFileFromPath(bm_file_path);
+    const readfile = try getBookMarkFileFromPath(bm_file_path);
     defer readfile.close();
     const rev = try readFileLinesReverse(readfile);
     defer allocator.free(rev);
@@ -108,7 +109,7 @@ pub fn add(name: []const u8, path: []u8, bm_file_path: []u8) !void {
     const path2 = try d.realpath(".", &buf);
     std.debug.print("Current directory from buf: {s}\n", .{path2});
 
-    const myfile = try getFileFromPath(bm_file_path);
+    const myfile = try getBookMarkFileFromPath(bm_file_path);
     defer myfile.close();
     std.debug.print("file is {}\n", .{myfile});
     return addToFile(name, path, myfile);
@@ -123,7 +124,7 @@ pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
     try writer.print("{s}{s}{s}\n", .{ name, delim, path });
     try bufwriter.flush();
 }
-pub fn getFileFromPath(path: []u8) !fs.File {
+pub fn getBookMarkFileFromPath(path: []u8) !fs.File {
     const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
         error.FileNotFound => {
             const new_file = try fs.createFileAbsolute(path, .{});
