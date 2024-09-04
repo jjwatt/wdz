@@ -1,17 +1,27 @@
 const std = @import("std");
 const fs = std.fs;
+const io = std.io;
 const mem = std.mem;
 const os = std.os;
 const process = std.process;
 
-// TODO: I want this to be $HOME/.wdz
-// pub const dbfile = ".wdz";
+const usage =
+    \\Usage: wdz [options]
+    \\
+    \\General Options:
+    \\
+    \\ -h, --help                Print usage
+    \\ -a, --add [name]          Add current directory with name
+    \\ -l, --list, --ls          List bookmarks
+    \\ -r, --remove, --rm [name] Remove bookmark
+    \\
+;
 
 // default k,v delim
 const delim = "|";
 // default bookmark file filename
 const default_bm_filename = ".wdz";
-// TODO: pass the allocator to functions instead of global
+// TODO: refactor pass the allocator to functions instead of global
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var allocator = gpa.allocator();
 
@@ -22,10 +32,15 @@ pub fn main() !void {
 
     var progargs = process.args();
     std.debug.print("ArgIterator looks like {}\n", .{progargs});
-    // std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
-    // I think we can use while over the ArgIterator
+    std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
     while (progargs.next()) |arg| {
         std.debug.print("arg from while ArgIterator: {s}\n", .{arg});
+        if (mem.startsWith(u8, arg, "-")) {
+            if (mem.eql(u8, arg, "-h") or mem.eql(u8, arg, "--help")) {
+                try io.getStdOut().writeAll(usage);
+                return;
+            }
+        }
     }
 
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
@@ -52,31 +67,23 @@ pub fn main() !void {
     defer readfile.close();
     const rev = try readFileLinesReverse(readfile);
     defer allocator.free(rev);
-    std.debug.print("rev: \n {s}\n", .{rev});
-    var entries = mem.split(u8, rev, "\n");
-    // std.debug.print("sm: {}\n", .{sm});
-    findloop: while (entries.next()) |entry| {
-        std.debug.print("entry: {s}\n", .{entry});
-        if (mem.startsWith(u8, entry, "fakebmname4")) {
-            std.debug.print("found: {s}\n", .{entry});
-            break :findloop;
-        }
-    } else {
-        std.debug.print("entry not found", .{});
-    }
+    // std.debug.print("rev: \n {s}\n", .{rev});
+
     // try find function
-    const entry = try find("fakebmname4", &entries);
+    std.debug.print("Using find() to find fakebmname4...\n", .{});
+    const entry = try find("fakebmname4", &rev);
     std.debug.print("found entry: {s}\n", .{entry});
 }
-pub fn find(name: []const u8, entries: *mem.SplitIterator(u8, .sequence)) ![]const u8 {
+pub fn find(name: []const u8, records: *const []u8) ![]const u8 {
+    var entries = mem.split(u8, records.*, "\n");
     while (entries.next()) |entry| {
         std.debug.print("entry: {s}\n", .{entry});
         if (mem.startsWith(u8, entry, name)) {
-            std.debug.print("found: {s}\n", .{entry});
             return entry;
         }
     } else {
         std.debug.print("return NotFound", .{});
+        // TODO: return a real error.
         return "not found\n";
     }
 }
@@ -138,6 +145,8 @@ pub fn readFileLinesReverse(file: fs.File) ![]u8 {
     for (lines.items) |line| {
         try reversed_lines.insert(0, line);
     }
+    // This seems unnecessary considering the above, but I can't seem to make
+    // it work with reversed_lines alone.
     var result = std.ArrayList(u8).init(allocator);
     for (reversed_lines.items) |line| {
         try result.appendSlice(line);
