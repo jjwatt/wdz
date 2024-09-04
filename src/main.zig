@@ -40,7 +40,9 @@ pub fn main() !void {
                 return;
             }
             if (mem.eql(u8, arg, "-l") or mem.eql(u8, arg, "--ls")) {
-                // call list
+                const lst = try list(allocator);
+                defer allocator.free(lst);
+                std.debug.print("lst from list:\n{s}\n", .{lst});
                 return;
             }
             if (mem.eql(u8, arg, "-a") or mem.eql(u8, arg, "--add")) {
@@ -61,24 +63,16 @@ pub fn main() !void {
 }
 pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
     // return the bookmark file
-    const bm_file_path = try getBookmarkFilePath(allocator);
-    defer allocator.free(bm_file_path);
-    const readfile = try getBookMarkFileFromPath(bm_file_path);
-    return readfile;
-}
-pub fn getBookmarkFilePath(allocator: mem.Allocator) ![]u8 {
-    // get the bookmark file path
+    // bookmark file is always $HOME/$bm_file_path (set at the top)
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
     std.debug.print("home_dir is {s}\n", .{home_dir});
     // cat filename onto the end of home_dir
     const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
-    return bm_file_path;
-}
-pub fn getBookMarkFileFromPath(path: []u8) !fs.File {
-    const file = fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
+    defer allocator.free(bm_file_path);
+    const file = fs.openFileAbsolute(bm_file_path, .{ .mode = .read_write }) catch |err| switch (err) {
         error.FileNotFound => {
-            const new_file = try fs.createFileAbsolute(path, .{});
+            const new_file = try fs.createFileAbsolute(bm_file_path, .{});
             return new_file;
         },
         else => {
@@ -88,18 +82,19 @@ pub fn getBookMarkFileFromPath(path: []u8) !fs.File {
     };
     return file;
 }
-pub fn list(allocator: mem.Allocator, bm_file_path: []u8) !*const []u8 {
+pub fn list(allocator: mem.Allocator) ![]u8 {
     // return list of records
 
     // stop adding while I mess with finding.
     // const fakename = "fakebmname4";
     // _ = try add(fakename, path2, bm_file_path);
 
-    const readfile = try getBookMarkFileFromPath(bm_file_path);
+    const readfile = try getBookMarkFile(allocator);
     defer readfile.close();
-    const rev = try readFileLinesReverse(readfile);
-    defer allocator.free(rev);
+    const rev = try readFileLinesReverse(allocator, readfile);
+    // defer allocator.free(rev);
     // std.debug.print("rev: \n {s}\n", .{rev});
+    return rev;
 }
 pub fn find(name: []const u8, records: *const []u8) ![]const u8 {
     var entries = mem.split(u8, records.*, "\n");
@@ -114,7 +109,7 @@ pub fn find(name: []const u8, records: *const []u8) ![]const u8 {
         return "not found\n";
     }
 }
-pub fn add(name: []const u8, path: []u8, bm_file_path: []u8) !void {
+pub fn add(allocator: mem.Allocator, name: []const u8, path: []u8) !void {
     const d: std.fs.Dir = std.fs.cwd();
     std.debug.print("cwd is {d}\n", d);
     std.debug.print("trying to look in value: {}\n", .{d});
@@ -125,7 +120,7 @@ pub fn add(name: []const u8, path: []u8, bm_file_path: []u8) !void {
     const path2 = try d.realpath(".", &buf);
     std.debug.print("Current directory from buf: {s}\n", .{path2});
 
-    const myfile = try getBookMarkFileFromPath(bm_file_path);
+    const myfile = try getBookMarkFile(allocator);
     defer myfile.close();
     std.debug.print("file is {}\n", .{myfile});
     return addToFile(name, path, myfile);
