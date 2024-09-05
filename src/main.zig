@@ -40,51 +40,8 @@ pub fn main() !void {
                 return;
             }
             if (mem.eql(u8, arg, "--test")) {
-                // do something for testing here
-                const readfile = try getBookMarkFile(allocator);
-                defer readfile.close();
-
-                // defer allocator.free(lines);
-                // std.debug.print("{s}\n", .{lines});
-                // for (lines.items) |line| {
-                //     std.debug.print("{s}\n", .{line});
-                // }
-
-                const stat = try readfile.stat();
-                const buffer = try allocator.alloc(u8, stat.size);
-                defer allocator.free(buffer);
-                const bytesread = try readfile.readAll(buffer);
-                if (bytesread != stat.size) return error.UnexpectedEndOfFile;
-
-                // Allocate lines
-                var lines = std.ArrayList([]const u8).init(allocator);
-                defer lines.deinit();
-
-                var entries = mem.splitBackwardsAny(u8, buffer, "\n");
-                while (entries.next()) |entry| {
-                    // skip empty ones.
-                    if (mem.eql(u8, entry, "")) {
-                        continue;
-                    }
-                    try lines.append(entry);
-                }
-                const entries_type = @TypeOf(entries);
-                std.debug.print("entries type: {}\n", .{entries_type});
-                std.debug.print("lines type: {}\n", .{@TypeOf(lines)});
-                for (lines.items) |line| {
-                    // skip empty ones
-                    // if (mem.eql(u8, line, "")) {
-                    //     continue;
-                    // }
-                    std.debug.print("{s}\n", .{line});
-                }
-                // Doing this like I do in the other function
-                // Maybe it's because the other one is []const u8?
-                // var result = std.ArrayList([]const u8).init(allocator);
-                // for (lines.items) |line| {
-                //     try result.append(line);
-                // }
-
+                // do testing stuff here
+                _ = try readFileLinesSplitIter2(allocator);
             }
             if (mem.eql(u8, arg, "-l") or mem.eql(u8, arg, "--ls") or mem.eql(u8, arg, "--list")) {
                 const lst = try list(allocator);
@@ -245,7 +202,7 @@ pub fn readFileLinesSplitIter(allocator: mem.Allocator, file: fs.File) !std.Arra
     }
     return result;
 }
-pub fn readFileLinesSplitIter2(allocator: mem.Allocator) ![]u8 {
+pub fn readFileLinesSplitIter2(allocator: mem.Allocator) !std.ArrayList(u8) {
     const readfile = try getBookMarkFile(allocator);
     defer readfile.close();
 
@@ -257,7 +214,7 @@ pub fn readFileLinesSplitIter2(allocator: mem.Allocator) ![]u8 {
 
     // Allocate lines
     var lines = std.ArrayList([]const u8).init(allocator);
-    defer lines.deinit();
+    // defer lines.deinit();
 
     var entries = mem.splitBackwardsAny(u8, buffer, "\n");
     while (entries.next()) |entry| {
@@ -277,6 +234,18 @@ pub fn readFileLinesSplitIter2(allocator: mem.Allocator) ![]u8 {
         // }
         std.debug.print("{s}\n", .{line});
     }
+    var result = std.ArrayList(u8).init(allocator);
+    for (lines.items) |line| {
+        try result.appendSlice(line);
+        try result.appendSlice("\n");
+    }
+    // defer result.deinit();
+    std.debug.print("typeof result: {}\n", .{@TypeOf(result)});
+    lines.deinit();
+    result.deinit();
+    return result;
+    // return result.toOwnedSlice();
+
 }
 pub fn readFileLinesReverse(allocator: mem.Allocator, file: fs.File) ![]u8 {
     // Read file into memory
