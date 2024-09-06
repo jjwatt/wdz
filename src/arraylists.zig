@@ -1,7 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 
-test "messing with attraylists" {
+test "messing with arraylist" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     defer _ = gpa.deinit();
@@ -18,6 +18,7 @@ test "messing with attraylists" {
     for (lines.items) |line| {
         std.debug.print("{s}\n", .{line});
     }
+    try buildArrayListReverseIter(allocator);
 }
 
 pub fn buildArrayList(allocator: mem.Allocator) !std.ArrayList([]const u8) {
@@ -38,5 +39,12 @@ pub fn buildArrayListReverse(allocator: mem.Allocator) !std.ArrayList([]const u8
         try backwards.insert(0, line);
     }
     return backwards;
+}
+pub fn buildArrayListReverseIter(allocator: mem.Allocator) !void {
+    var lines = try buildArrayList(allocator);
+    // defer lines.deinit();
+    const sl = lines.toOwnedSlice();
+    std.debug.print("type of sl: {}\n", .{@TypeOf(sl)});
+    std.debug.print("trying to print with reverseIterator...", .{});
 }
 // pub fn main() !void {}
