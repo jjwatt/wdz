@@ -36,6 +36,7 @@ test "test reverseListPrint" {
     try reverseListPrint(allocator);
     std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
 }
+/// Build the reverse ArrayList by inserting into a new ArrayList.
 pub fn buildArrayListReverse(allocator: mem.Allocator) !std.ArrayList([]const u8) {
     const lines = try buildArrayList(allocator);
     defer lines.deinit();
@@ -45,6 +46,7 @@ pub fn buildArrayListReverse(allocator: mem.Allocator) !std.ArrayList([]const u8
     }
     return backwards;
 }
+/// Use a reverseIterator to build the ArrayList.
 pub fn buildArrayListReverseIter(allocator: mem.Allocator) !std.ArrayList([]const u8) {
     // This seems more complex than the one that inserts into a new
     // array list, but it tests 2-3x faster than the other one,
@@ -66,9 +68,12 @@ pub fn buildArrayListReverseIter(allocator: mem.Allocator) !std.ArrayList([]cons
     }
     return backwards;
 }
+/// Get the arraylist, reverse it and print it to stdout.
 pub fn reverseListPrint(allocator: mem.Allocator) !void {
     // this will get the list and print it in reverse to stdout
     // does not return anything or allocate the extra ArrayList
+    /// lines from buildArrayList which returns an arraylist
+    /// for testing.
     var lines = try buildArrayList(allocator);
     defer lines.deinit();
     const sl = try lines.toOwnedSlice();
@@ -78,6 +83,7 @@ pub fn reverseListPrint(allocator: mem.Allocator) !void {
         try stdout.writer().print("{s}\n", .{line});
     }
 }
+/// Build and return an ArrayList for testing.
 pub fn buildArrayList(allocator: mem.Allocator) !std.ArrayList([]const u8) {
     // build an ArrayList and try to return it
     var lines = std.ArrayList([]const u8).init(allocator);
