@@ -19,8 +19,6 @@ test "test buildArrayListReverseIter" {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-    const lines = try buildArrayListReverse(allocator);
-    defer lines.deinit();
     const rev = try buildArrayListReverseIter(allocator);
     std.debug.print("printing after reverseIter...\n", .{});
     for (rev.items) |item| {
@@ -29,6 +27,15 @@ test "test buildArrayListReverseIter" {
     std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
 }
 
+test "test reverseListPrint" {
+    // this one will reverse it and print to stdout
+    var timer = try std.time.Timer.start();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    try reverseListPrint(allocator);
+    std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
+}
 pub fn buildArrayListReverse(allocator: mem.Allocator) !std.ArrayList([]const u8) {
     const lines = try buildArrayList(allocator);
     defer lines.deinit();
@@ -62,7 +69,14 @@ pub fn buildArrayListReverseIter(allocator: mem.Allocator) !std.ArrayList([]cons
 pub fn reverseListPrint(allocator: mem.Allocator) !void {
     // this will get the list and print it in reverse to stdout
     // does not return anything or allocate the extra ArrayList
-    // var lines = try buildArrayList(allocator);
+    var lines = try buildArrayList(allocator);
+    defer lines.deinit();
+    const sl = try lines.toOwnedSlice();
+    var it = mem.reverseIterator(sl);
+    const stdout = std.io.getStdOut();
+    while (it.next()) |line| {
+        try stdout.writer().print("{s}\n", .{line});
+    }
 }
 pub fn buildArrayList(allocator: mem.Allocator) !std.ArrayList([]const u8) {
     // build an ArrayList and try to return it
