@@ -12,6 +12,7 @@ const usage =
     \\
     \\ -h, --help                Print usage
     \\ -a, --add [name]          Add current directory with name
+    \\ -f, --find [name]         Find an bookmark and return the path
     \\ -l, --list, --ls          List bookmarks
     \\ -r, --remove, --rm [name] Remove bookmark
     \\
