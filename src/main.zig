@@ -26,6 +26,7 @@ const default_bm_filename = ".wdz";
 
 pub fn main() !void {
     // const d: std.fs.Dir = std.fs.cwd();
+    // TODO: Use arena allocator (see arraylist.zig)
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();
     defer _ = gpa.deinit();
