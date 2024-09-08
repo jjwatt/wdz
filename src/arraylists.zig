@@ -72,15 +72,18 @@ pub fn buildArrayListReverseIter(allocator: mem.Allocator) !std.ArrayList([]cons
 pub fn reverseListPrint(allocator: mem.Allocator) !void {
     // this will get the list and print it in reverse to stdout
     // does not return anything or allocate the extra ArrayList
-    /// lines from buildArrayList which returns an arraylist
-    /// for testing.
+    // lines from buildArrayList which returns an arraylist for testing.
     var lines = try buildArrayList(allocator);
     defer lines.deinit();
     const sl = try lines.toOwnedSlice();
     var it = mem.reverseIterator(sl);
     const stdout = std.io.getStdOut();
     while (it.next()) |line| {
-        try stdout.writer().print("{s}\n", .{line});
+        if (mem.eql(u8, line, "")) {
+            continue;
+        } else {
+            try stdout.writer().print("{s}\n", .{line});
+        }
     }
 }
 /// Build and return an ArrayList for testing.
