@@ -26,10 +26,10 @@ const default_bm_filename = ".wdz";
 
 pub fn main() !void {
     // const d: std.fs.Dir = std.fs.cwd();
-    // TODO: Use arena allocator (see arraylist.zig)
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var allocator = gpa.allocator();
-    defer _ = gpa.deinit();
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     var progargs = process.args();
     // std.debug.print("ArgIterator looks like {}\n", .{progargs});
@@ -43,13 +43,18 @@ pub fn main() !void {
             }
             if (mem.eql(u8, arg, "--test")) {
                 // do testing stuff here
-                _ = try readFileLinesSplitIter2(allocator);
+                var timer = try std.time.Timer.start();
+                try listPrint(allocator);
+                std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
+                process.exit(0);
             }
             if (mem.eql(u8, arg, "-l") or mem.eql(u8, arg, "--ls") or mem.eql(u8, arg, "--list")) {
+                var timer = try std.time.Timer.start();
                 const lst = try list(allocator);
                 defer allocator.free(lst);
                 const stdout = io.getStdOut().writer();
                 try stdout.print("{s}\n", .{lst});
+                std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
                 process.exit(0);
             }
             if (mem.eql(u8, arg, "-a") or mem.eql(u8, arg, "--add")) {
@@ -112,7 +117,8 @@ pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
     // cat filename onto the end of home_dir
     const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
     defer allocator.free(bm_file_path);
-    const file = fs.openFileAbsolute(bm_file_path, .{ .mode = .read_write }) catch |err| switch (err) {
+    const file =
+        fs.openFileAbsolute(bm_file_path, .{ .mode = .read_write }) catch |err| switch (err) {
         error.FileNotFound => {
             const new_file = try fs.createFileAbsolute(bm_file_path, .{});
             return new_file;
@@ -132,6 +138,31 @@ pub fn list(allocator: mem.Allocator) ![]u8 {
     // defer allocator.free(rev);
     // std.debug.print("rev: \n {s}\n", .{rev});
     return rev;
+}
+/// Prints list of records to stdout
+pub fn listPrint(allocator: mem.Allocator) !void {
+    const file = try getBookMarkFile(allocator);
+    defer file.close();
+    // Read file into memory
+    const stat = try file.stat();
+    const buffer = try allocator.alloc(u8, stat.size);
+    defer allocator.free(buffer);
+    const bytesread = try file.readAll(buffer);
+    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
+
+    // Setup to iterate over lines in reverse.
+    var it = mem.splitBackwardsAny(u8, buffer, "\n");
+
+    // Print lines to stdout.
+    const stdout_writer = std.io.getStdOut().writer();
+    while (it.next()) |line| {
+        // Skip empty lines.
+        if (mem.eql(u8, line, "")) {
+            continue;
+        } else {
+            try stdout_writer.print("{s}\n", .{line});
+        }
+    }
 }
 pub fn find(name: []const u8, records: *const []u8) ?[]const u8 {
     var entries = mem.splitAny(u8, records.*, "\n");
@@ -273,12 +304,18 @@ pub fn readFileLinesReverse(allocator: mem.Allocator, file: fs.File) ![]u8 {
     var reversed_lines = std.ArrayList([]const u8).init(allocator);
     defer reversed_lines.deinit();
     for (lines.items) |line| {
+        if (mem.eql(u8, line, "")) {
+            continue;
+        }
         try reversed_lines.insert(0, line);
     }
     // This seems unnecessary considering the above, but I can't seem to make
     // it work with reversed_lines alone.
     var result = std.ArrayList(u8).init(allocator);
     for (reversed_lines.items) |line| {
+        if (mem.eql(u8, line, "")) {
+            continue;
+        }
         try result.appendSlice(line);
         try result.append('\n');
     }
