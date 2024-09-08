@@ -22,20 +22,14 @@ const usage =
 const delim = "|";
 // default bookmark file filename
 const default_bm_filename = ".wdz";
-// TODO: refactor pass the allocator to functions instead of global
 
 pub fn main() !void {
-    // const d: std.fs.Dir = std.fs.cwd();
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
     var progargs = process.args();
-    // std.debug.print("ArgIterator looks like {}\n", .{progargs});
-    // std.debug.print("arg from ArgIterator.next(): {?s}\n", .{progargs.next()});
     while (progargs.next()) |arg| {
-        // std.debug.print("arg from while ArgIterator: {s}\n", .{arg});
         if (mem.startsWith(u8, arg, "-")) {
             if (mem.eql(u8, arg, "-h") or mem.eql(u8, arg, "--help")) {
                 try io.getStdOut().writeAll(usage);
@@ -87,38 +81,23 @@ pub fn main() !void {
                         const stdout = io.getStdOut().writer();
                         try stdout.print("{s}\n", .{entry});
                         process.exit(0);
-                        // if (entry) |e| {
-                        //     std.debug.print("{s}\n", .{e});
-                        //     process.exit(0);
-                        // } else {
-                        //     process.exit(1);
-                        // }
                     }
                 }
             }
         }
     }
-
-    // const readfile = try getBookMarkFile(allocator);
-    // const rev = try readFileLinesReverse(allocator, readfile);
-    // defer allocator.free(rev);
-    // std.debug.print("rev: \n {s}\n", .{rev});
-    // try find function
-    // std.debug.print("Using find() to find fakebmname4...\n", .{});
-    // const entry = try find("fakebmname4", &rev);
-    // std.debug.print("found entry: {s}\n", .{entry});
 }
 pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
     // return the bookmark file
     // bookmark file is always $HOME/$bm_file_path (set at the top)
     const home_dir = try process.getEnvVarOwned(allocator, "HOME");
     defer allocator.free(home_dir);
-    // std.debug.print("home_dir is {s}\n", .{home_dir});
     // cat filename onto the end of home_dir
     const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, default_bm_filename });
     defer allocator.free(bm_file_path);
     const file =
-        fs.openFileAbsolute(bm_file_path, .{ .mode = .read_write }) catch |err| switch (err) {
+        fs.openFileAbsolute(bm_file_path, .{ .mode = .read_write }) catch |err|
+        switch (err) {
         error.FileNotFound => {
             const new_file = try fs.createFileAbsolute(bm_file_path, .{});
             return new_file;
@@ -321,32 +300,3 @@ pub fn readFileLinesReverse(allocator: mem.Allocator, file: fs.File) ![]u8 {
     }
     return result.toOwnedSlice();
 }
-// pub fn addToFile(name: []u8, path: []u8, db: *std.fs.File) !void {
-//     // open db file
-//     // name & path to file
-// }
-// pub fn getCwd(allocator: std.mem.Allocator) !?[]u8 {
-//     const d: std.fs.Dir = std.fs.cwd();
-//     std.debug.print("cwd is {d}\n", d);
-//     std.debug.print("trying to look in value: {}\n", .{d});
-
-//     const path = try d.realpathAlloc(allocator, ".");
-//     std.debug.print("Current directory: {s}\n", .{path});
-//     // can't really return this. I need to learn more zig.
-//     return path;
-// }
-// cwd (call real fs.cwd() or override for testing)
-// add (Bookmark, BookmarkFile)
-//   add will add the string and cwd to the bookmarkfile
-// dirAdd (name: []u8, directory: fs.Dir, BookmarkFile)
-// del/rm (Identifier, BookmarkFile)
-// pop (Identifier, BookmarkFile)
-//    rm removes all occurances, pop just the last one.
-// ls/list (Filter, BookmarkFile)
-// readfile (BookmarkFile)
-// writefile (BookmarkFile)
-// Identifier would just be a string that we can check against multiple fields
-// Filter would be a string that we can search or maybe glob or re
-// pub const Bookmark = struct { name: []u8, path: []u8 };
-// pub const BookmarkFile = struct { path: []u8 = "~/.wdz" };
-// BookmarkFile .content?
