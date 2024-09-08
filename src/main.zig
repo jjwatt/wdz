@@ -38,7 +38,10 @@ pub fn main() !void {
             if (mem.eql(u8, arg, "--test")) {
                 // do testing stuff here
                 var timer = try std.time.Timer.start();
-                try listPrint(allocator);
+                // try listPrint(allocator);
+                const bmfilepath = try bookMarkFilePath(allocator, default_bm_filename);
+                defer allocator.free(bmfilepath);
+                std.debug.print("bmfilepath: {s}\n", .{bmfilepath});
                 std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
                 process.exit(0);
             }
@@ -87,6 +90,16 @@ pub fn main() !void {
         }
     }
 }
+pub fn bookMarkFilePath(allocator: mem.Allocator, bm_filename: []const u8) ![]const u8 {
+    // bookmark file is always $HOME/$bm_file_path (set at the top).
+    const home_dir = try process.getEnvVarOwned(allocator, "HOME");
+    defer allocator.free(home_dir);
+
+    // cat filename onto the end of home_dir.
+    const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, bm_filename });
+    return bm_file_path;
+}
+pub fn bookMarkFile(allocator: mem.Allocator) !fs.File {}
 pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
     // return the bookmark file
     // bookmark file is always $HOME/$bm_file_path (set at the top)
