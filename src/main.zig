@@ -47,12 +47,9 @@ pub fn main() !void {
                 process.exit(0);
             }
             if (mem.eql(u8, arg, "-l") or mem.eql(u8, arg, "--ls") or mem.eql(u8, arg, "--list")) {
-                var timer = try std.time.Timer.start();
-                const lst = try list(allocator);
-                defer allocator.free(lst);
-                const stdout = io.getStdOut().writer();
-                try stdout.print("{s}\n", .{lst});
-                std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
+                // var timer = try std.time.Timer.start();
+                try listPrint(allocator);
+                // std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
                 process.exit(0);
             }
             if (mem.eql(u8, arg, "-a") or mem.eql(u8, arg, "--add")) {
@@ -113,21 +110,20 @@ pub fn bookMarkFileHandle(path: []const u8) !fs.File {
     };
     return file;
 }
+pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
+    const bm_file_path = try bookMarkFilePath(allocator, default_bm_filename);
+    defer allocator.free(bm_file_path);
+    const bmfile = try bookMarkFileHandle(bm_file_path);
+    return bmfile;
+}
 test "get bookmark file path" {
     const allocator = std.testing.allocator;
     const bm_file_path = try bookMarkFilePath(allocator, default_bm_filename);
     defer allocator.free(bm_file_path);
     std.debug.print("bookmark filepath: {s}\n", .{bm_file_path});
     // This won't be true if home isn't /home
+    // Remove or change this test if different.
     try testing.expect(mem.startsWith(u8, bm_file_path, "/home"));
-}
-test "get bookmark file handle" {
-    const allocator = std.testing.allocator;
-    const bm_file_path = try bookMarkFilePath(allocator, default_bm_filename);
-    defer allocator.free(bm_file_path);
-    const bmfile = try bookMarkFileHandle(bm_file_path);
-    defer bmfile.close();
-    std.debug.print("typeof bmfile: {}\n", .{bmfile});
 }
 test "getBookMarkFile" {
     const allocator = std.testing.allocator;
@@ -135,13 +131,7 @@ test "getBookMarkFile" {
     defer bmfile.close();
     std.debug.print("typeof bmfile: {}\n", .{bmfile});
 }
-pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
-    const bm_file_path = try bookMarkFilePath(allocator, default_bm_filename);
-    defer allocator.free(bm_file_path);
-    const bmfile = try bookMarkFileHandle(bm_file_path);
-    std.debug.print("typeof bmfile: {}\n", .{bmfile});
-    return bmfile;
-}
+/// Returns a list of records as []u8
 pub fn list(allocator: mem.Allocator) ![]u8 {
     // return list of records
     const readfile = try getBookMarkFile(allocator);
@@ -176,6 +166,10 @@ pub fn listPrint(allocator: mem.Allocator) !void {
         }
     }
 }
+test "testing listPrint" {
+    const allocator = std.testing.allocator;
+    try listPrint(allocator);
+}
 pub fn find(name: []const u8, records: *const []u8) ?[]const u8 {
     var entries = mem.splitAny(u8, records.*, "\n");
     while (entries.next()) |entry| {
@@ -188,14 +182,10 @@ pub fn find(name: []const u8, records: *const []u8) ?[]const u8 {
             return it.next();
         }
     } else {
-        std.debug.print("return NotFound", .{});
-        // TODO: return a real error.
-        return "not found\n";
+        return null;
     }
 }
-// pub fn findInFile(name: []const u8) ![]const u8 {
-//     // try to find first entry in file.
-// }
+
 pub fn add(allocator: mem.Allocator, name: []const u8) !void {
     const d: std.fs.Dir = std.fs.cwd();
     // std.debug.print("cwd is {d}\n", d);
