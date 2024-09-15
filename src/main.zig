@@ -46,7 +46,7 @@ pub fn main() !void {
                 std.debug.print("took: {d} nanoseconds\n", .{timer.lap()});
                 process.exit(0);
             }
-            if (mem.eql(u8, arg, "--list-all")) {
+            if (mem.eql(u8, arg, "--list-all") or mem.eql(u8, arg, "--la")) {
                 try listPrintAllValues(allocator);
                 process.exit(0);
             }
