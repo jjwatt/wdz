@@ -82,7 +82,7 @@ pub fn main() !void {
                         // const stdout = io.getStdOut().writer();
                         // try stdout.print("{s}\n", .{entry});
                         // _ = try listPrintFindByName(allocator, bmfile, bm_search);
-                        _ = try listPrintFindByValue(allocator, bmfile, bm_search);
+                        _ = try listPrintFindByName(allocator, bmfile, bm_search);
                         process.exit(0);
                     }
                 }
@@ -226,6 +226,7 @@ test "testing listPrint" {
     try listPrint(allocator);
 }
 // TODO: findByName, findByValue, findByNameOrValue
+// TODO: findAllByName, findAllByValue
 // TODO: don't pass records, just a file.
 /// find the first entry that starts with string
 pub fn find(name: []const u8, records: *const []u8) ?[]const u8 {
