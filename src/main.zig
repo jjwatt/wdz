@@ -76,11 +76,13 @@ pub fn main() !void {
                     } else {
                         const bmfile = try getBookMarkFile(allocator);
                         defer bmfile.close();
-                        const rev = try readFileLinesReverse(allocator, bmfile);
-                        defer allocator.free(rev);
-                        const entry = find(bm_search, &rev) orelse process.exit(1);
-                        const stdout = io.getStdOut().writer();
-                        try stdout.print("{s}\n", .{entry});
+                        // const rev = try readFileLinesReverse(allocator, bmfile);
+                        // defer allocator.free(rev);
+                        // const entry = find(bm_search, &rev) orelse process.exit(1);
+                        // const stdout = io.getStdOut().writer();
+                        // try stdout.print("{s}\n", .{entry});
+                        // _ = try listPrintFindByName(allocator, bmfile, bm_search);
+                        _ = try listPrintFindByValue(allocator, bmfile, bm_search);
                         process.exit(0);
                     }
                 }
@@ -143,6 +145,7 @@ pub fn list(allocator: mem.Allocator) ![]u8 {
 }
 /// Prints list of records to stdout
 pub fn listPrint(allocator: mem.Allocator) !void {
+    // TODO: put this in a function that returns buffer.
     const file = try getBookMarkFile(allocator);
     defer file.close();
     // Read file into memory
@@ -166,10 +169,65 @@ pub fn listPrint(allocator: mem.Allocator) !void {
         }
     }
 }
+pub fn listPrintFindByName(allocator: mem.Allocator, bmfile: fs.File, name: []const u8) !void {
+    // Read file into memory.
+    const stat = try bmfile.stat();
+    const buffer = try allocator.alloc(u8, stat.size);
+    defer allocator.free(buffer);
+    const bytesread = try bmfile.readAll(buffer);
+    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
+
+    // Setup to iterate over lines in reverse.
+    var entries = mem.splitBackwardsAny(u8, buffer, "\n");
+    const stdout_writer = std.io.getStdOut().writer();
+    while (entries.next()) |entry| {
+        if (mem.startsWith(u8, entry, name)) {
+            var it = mem.splitAny(u8, entry, delim);
+            // skip the first part.
+            _ = it.next();
+            const val = it.next() orelse process.exit(1);
+            try stdout_writer.print("{s}\n", .{val});
+            break;
+        }
+    } else {
+        process.exit(1);
+    }
+}
+pub fn listPrintFindByValue(allocator: mem.Allocator, bmfile: fs.File, value: []const u8) !void {
+    // Read file into memory.
+    const stat = try bmfile.stat();
+    const buffer = try allocator.alloc(u8, stat.size);
+    defer allocator.free(buffer);
+    const bytesread = try bmfile.readAll(buffer);
+    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
+
+    // Setup to iterate over lines in reverse.
+    var entries = mem.splitBackwardsAny(u8, buffer, "\n");
+    const stdout_writer = std.io.getStdOut().writer();
+    while (entries.next()) |entry| {
+        if (mem.eql(u8, entry, "")) {
+            continue;
+        }
+        var it = mem.splitAny(u8, entry, delim);
+        // skip the first part.
+        _ = it.next();
+        const val = it.next() orelse process.exit(1);
+        if (mem.startsWith(u8, val, value)) {
+            try stdout_writer.print("{s}\n", .{val});
+            break;
+        }
+    } else {
+        process.exit(1);
+    }
+}
+
 test "testing listPrint" {
     const allocator = std.testing.allocator;
     try listPrint(allocator);
 }
+// TODO: findByName, findByValue, findByNameOrValue
+// TODO: don't pass records, just a file.
+/// find the first entry that starts with string
 pub fn find(name: []const u8, records: *const []u8) ?[]const u8 {
     var entries = mem.splitAny(u8, records.*, "\n");
     while (entries.next()) |entry| {
