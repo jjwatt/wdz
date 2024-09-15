@@ -131,16 +131,6 @@ test "getBookMarkFile" {
     defer bmfile.close();
     std.debug.print("typeof bmfile: {}\n", .{bmfile});
 }
-/// Returns a list of records as []u8
-pub fn list(allocator: mem.Allocator) ![]u8 {
-    // return list of records
-    const readfile = try getBookMarkFile(allocator);
-    defer readfile.close();
-    const rev = try readFileLinesReverse(allocator, readfile);
-    // defer allocator.free(rev);
-    // std.debug.print("rev: \n {s}\n", .{rev});
-    return rev;
-}
 /// Prints list of records to stdout
 pub fn listPrint(allocator: mem.Allocator) !void {
     // TODO: put this in a function that returns buffer.
@@ -259,23 +249,6 @@ test "testing listPrint" {
 // TODO: findByName, findByValue, findByNameOrValue
 // TODO: findAllByName, findAllByValue
 // TODO: don't pass records, just a file.
-/// find the first entry that starts with string
-pub fn find(name: []const u8, records: *const []u8) ?[]const u8 {
-    var entries = mem.splitAny(u8, records.*, "\n");
-    while (entries.next()) |entry| {
-        if (mem.startsWith(u8, entry, name)) {
-            // Split on delimiter to get the entry.
-            // delim is declared outside the fn.
-            var it = mem.splitAny(u8, entry, delim);
-            // skip the first part.
-            _ = it.next();
-            return it.next();
-        }
-    } else {
-        return null;
-    }
-}
-
 pub fn add(allocator: mem.Allocator, name: []const u8) !void {
     const d: std.fs.Dir = std.fs.cwd();
     // std.debug.print("cwd is {d}\n", d);
@@ -301,115 +274,4 @@ pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
     const writer = bufwriter.writer();
     try writer.print("{s}{s}{s}\n", .{ name, delim, path });
     try bufwriter.flush();
-}
-pub fn readFileLinesSplitIter(allocator: mem.Allocator, file: fs.File) !std.ArrayList([]const u8) {
-    // Read file into memory
-    const stat = try file.stat();
-    const buffer = try allocator.alloc(u8, stat.size);
-    defer allocator.free(buffer);
-    const bytesread = try file.readAll(buffer);
-    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
-
-    // Allocate lines
-    var lines = std.ArrayList([]const u8).init(allocator);
-    defer lines.deinit();
-
-    var entries = mem.splitBackwardsAny(u8, buffer, "\n");
-    while (entries.next()) |entry| {
-        try lines.append(entry);
-    }
-
-    // Doing this like I do in the other function
-    // Maybe it's because the other one is []const u8?
-    var result = std.ArrayList([]const u8).init(allocator);
-    for (lines.items) |line| {
-        try result.append(line);
-    }
-    return result;
-}
-pub fn readFileLinesSplitIter2(allocator: mem.Allocator) !std.ArrayList(u8) {
-    const readfile = try getBookMarkFile(allocator);
-    defer readfile.close();
-
-    const stat = try readfile.stat();
-    const buffer = try allocator.alloc(u8, stat.size);
-    defer allocator.free(buffer);
-    const bytesread = try readfile.readAll(buffer);
-    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
-
-    // Allocate lines
-    var lines = std.ArrayList([]const u8).init(allocator);
-    // defer lines.deinit();
-
-    var entries = mem.splitBackwardsAny(u8, buffer, "\n");
-    while (entries.next()) |entry| {
-        // skip empty ones.
-        if (mem.eql(u8, entry, "")) {
-            continue;
-        }
-        try lines.append(entry);
-    }
-    const entries_type = @TypeOf(entries);
-    std.debug.print("entries type: {}\n", .{entries_type});
-    std.debug.print("lines type: {}\n", .{@TypeOf(lines)});
-    for (lines.items) |line| {
-        // skip empty ones
-        // if (mem.eql(u8, line, "")) {
-        //     continue;
-        // }
-        std.debug.print("{s}\n", .{line});
-    }
-    var result = std.ArrayList(u8).init(allocator);
-    for (lines.items) |line| {
-        try result.appendSlice(line);
-        try result.appendSlice("\n");
-    }
-    // defer result.deinit();
-    std.debug.print("typeof result: {}\n", .{@TypeOf(result)});
-    lines.deinit();
-    result.deinit();
-    return result;
-    // return result.toOwnedSlice();
-
-}
-pub fn readFileLinesReverse(allocator: mem.Allocator, file: fs.File) ![]u8 {
-    // Read file into memory
-    const stat = try file.stat();
-    var buffer = try allocator.alloc(u8, stat.size);
-    defer allocator.free(buffer);
-    const bytesread = try file.readAll(buffer);
-    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
-
-    // Allocate lines
-    var lines = std.ArrayList([]const u8).init(allocator);
-    defer lines.deinit();
-
-    // Split buffer into lines
-    var line_start: usize = 0;
-    for (buffer, 0..) |char, i| {
-        if (char == '\n') {
-            try lines.append(buffer[line_start..i]);
-            line_start = i + 1;
-        }
-    }
-    // Reverse the order of the lines.
-    var reversed_lines = std.ArrayList([]const u8).init(allocator);
-    defer reversed_lines.deinit();
-    for (lines.items) |line| {
-        if (mem.eql(u8, line, "")) {
-            continue;
-        }
-        try reversed_lines.insert(0, line);
-    }
-    // This seems unnecessary considering the above, but I can't seem to make
-    // it work with reversed_lines alone.
-    var result = std.ArrayList(u8).init(allocator);
-    for (reversed_lines.items) |line| {
-        if (mem.eql(u8, line, "")) {
-            continue;
-        }
-        try result.appendSlice(line);
-        try result.append('\n');
-    }
-    return result.toOwnedSlice();
 }
