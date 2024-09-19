@@ -15,7 +15,8 @@ const usage =
     \\ -a, --add [name]          Add current directory with name
     \\ -f, --find [name]         Find an bookmark and return the path
     \\ -l, --list, --ls          List bookmarks
-    \\ -r, --remove, --rm [name] Remove bookmark
+    \\ --list-all                List all values (useful to use with fuzzy matchers)
+    \\ -r, --pop, --rm [name]    Remove and return bookmark
     \\
 ;
 
@@ -70,6 +71,22 @@ pub fn main() !void {
                     }
                 }
             }
+            if (mem.eql(u8, arg, "-r") or mem.eql(u8, arg, "--pop")) {
+                // Get bookmark name.
+                if (progargs.next()) |bm_name| {
+                    if (mem.startsWith(u8, bm_name, "-")) {
+                        std.log.err("Expected a name after -r or --pop", .{});
+                        process.exit(1);
+                    } else {
+                        const bmfile = try getBookMarkFile(allocator);
+                        defer bmfile.close();
+                        // can do catch |err| switch |err| trick here
+                        _ = try popFromFile(allocator, bmfile, bm_name);
+                        return;
+                    }
+                }
+            }
+
             if (mem.eql(u8, arg, "-f") or mem.eql(u8, arg, "--find")) {
                 // Try to find latest bookmark name entry
                 // TODO: later we'll add pop() and iterators or multiple returns
@@ -131,7 +148,7 @@ test "getBookMarkFile" {
     defer bmfile.close();
     std.debug.print("typeof bmfile: {}\n", .{bmfile});
 }
-/// Prints list of records to stdout
+/// Prints list of all records to stdout
 pub fn listPrint(allocator: mem.Allocator) !void {
     // TODO: put this in a function that returns buffer.
     const file = try getBookMarkFile(allocator);
@@ -246,9 +263,6 @@ test "testing listPrint" {
     const allocator = std.testing.allocator;
     try listPrint(allocator);
 }
-// TODO: findByName, findByValue, findByNameOrValue
-// TODO: findAllByName, findAllByValue
-// TODO: don't pass records, just a file.
 pub fn add(allocator: mem.Allocator, name: []const u8) !void {
     const d: std.fs.Dir = std.fs.cwd();
     // std.debug.print("cwd is {d}\n", d);
@@ -266,7 +280,6 @@ pub fn add(allocator: mem.Allocator, name: []const u8) !void {
     return addToFile(name, path, myfile);
 }
 pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
-    // it doesn't write to the end and I don't see an O_APPEND Flag in OpenFlags...
     // Seek to the end for append.
     const stat = try file.stat();
     try file.seekTo(stat.size);
@@ -274,4 +287,38 @@ pub fn addToFile(name: []const u8, path: []u8, file: fs.File) !void {
     const writer = bufwriter.writer();
     try writer.print("{s}{s}{s}\n", .{ name, delim, path });
     try bufwriter.flush();
+}
+// TODO: pop - take the first entry that matches and return it and rewrite the file without it
+pub fn popFromFile(allocator: mem.Allocator, file: fs.File, name: []const u8) ![]const u8 {
+    // read file into memory
+    // find first occurance iterating backwards, save it and remove it from the list
+    // rewrite list without first occurance
+    // return value
+    // Read file into memory.
+    const stat = try file.stat();
+    const buffer = try allocator.alloc(u8, stat.size);
+    defer allocator.free(buffer);
+    const bytesread = try file.readAll(buffer);
+    if (bytesread != stat.size) return error.UnexpectedEndOfFile;
+
+    // Setup to iterate over lines in reverse.
+    var entries = mem.splitBackwardsAny(u8, buffer, "\n");
+    const stdout_writer = std.io.getStdOut().writer();
+    while (entries.next()) |entry| {
+        if (mem.startsWith(u8, entry, name)) {
+            var it = mem.splitAny(u8, entry, delim);
+            // skip the first part.
+            _ = it.next();
+            if (it.next()) |val| {
+                try stdout_writer.print("{s}\n", .{val});
+                return val;
+            }
+        }
+    } else {
+        // TODO: change this to return an error or something
+        return error.NotFound;
+    }
+    // That will print it. We could go through buffer again and write everything
+    // except for the entry that matches back to the file. Will probably have to
+    // seek to the beginning.
 }
