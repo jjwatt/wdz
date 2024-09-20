@@ -1,0 +1,3 @@
+[submodule "fnf"]
+	path = fnf
+	url = https://github.com/jjwatt/fnf.git
