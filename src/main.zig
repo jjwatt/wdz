@@ -114,25 +114,28 @@ pub fn bookMarkFilePath(allocator: mem.Allocator, bm_filename: []const u8) ![]co
     const bm_file_path = try fs.path.join(allocator, &[_][]const u8{ home_dir, bm_filename });
     return bm_file_path;
 }
+
 pub fn bookMarkFileHandle(path: []const u8) !fs.File {
     const file =
         fs.openFileAbsolute(path, .{ .mode = .read_write }) catch |err| switch (err) {
-        error.FileNotFound => {
-            return try fs.createFileAbsolute(path, .{});
-        },
-        else => {
-            std.debug.print("error opening file: {}\n", .{err});
-            return err;
-        },
-    };
+            error.FileNotFound => {
+                return try fs.createFileAbsolute(path, .{});
+            },
+            else => {
+                std.debug.print("error opening file: {}\n", .{err});
+                return err;
+            },
+        };
     return file;
 }
+
 pub fn getBookMarkFile(allocator: mem.Allocator) !fs.File {
     const bm_file_path = try bookMarkFilePath(allocator, default_bm_filename);
     defer allocator.free(bm_file_path);
     const bmfile = try bookMarkFileHandle(bm_file_path);
     return bmfile;
 }
+
 test "get bookmark file path" {
     const allocator = std.testing.allocator;
     const bm_file_path = try bookMarkFilePath(allocator, default_bm_filename);
@@ -142,12 +145,14 @@ test "get bookmark file path" {
     // Remove or change this test if different.
     try testing.expect(mem.startsWith(u8, bm_file_path, "/home"));
 }
+
 test "getBookMarkFile" {
     const allocator = std.testing.allocator;
     const bmfile = try getBookMarkFile(allocator);
     defer bmfile.close();
     std.debug.print("typeof bmfile: {}\n", .{bmfile});
 }
+
 /// Prints list of all records to stdout
 pub fn listPrint(allocator: mem.Allocator) !void {
     // TODO: put this in a function that returns buffer.
